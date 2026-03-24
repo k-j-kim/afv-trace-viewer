@@ -277,8 +277,9 @@
   }
 
   .badge-ttft { background: var(--purple-dim); color: var(--purple); }
-  .badge-tool { background: var(--yellow-dim); color: var(--yellow); }
-  .badge-none { background: var(--bg3); color: var(--text-dim); }
+  .badge-tool  { background: var(--yellow-dim); color: var(--yellow); }
+  .badge-skill { background: var(--green-dim);  color: var(--green); }
+  .badge-none  { background: var(--bg3); color: var(--text-dim); }
 
   .chevron {
     color: var(--text-dim);
@@ -870,9 +871,15 @@ function renderStats(parsed) {
     </div>` : ''}
   `;
 
+  const allSkills = new Set(responses.flatMap(r => r.skills));
+
   bar.innerHTML += `<div class="tools-section">
     <div class="tools-section-label">Tools used (${allTools.size})</div>
     <div class="tools-section-body">${[...allTools].map(t => `<span class="badge badge-tool">${esc(t)}</span>`).join(' ') || '<span style="color:var(--text-dim);font-size:12px">none</span>'}</div>
+  </div>
+  <div class="tools-section">
+    <div class="tools-section-label">Skills used (${allSkills.size})</div>
+    <div class="tools-section-body">${[...allSkills].map(s => `<span class="badge badge-skill">${esc(s)}</span>`).join(' ') || '<span style="color:var(--text-dim);font-size:12px">none</span>'}</div>
   </div>`;
 }
 
