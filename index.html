@@ -760,7 +760,8 @@ function parseSections(raw) {
         const block = skillsMatch[1].trim();
         if (!block.includes('_(none)_')) {
           skills = block.split('\n').map(l => {
-            const m = l.match(/^-\s*`([^`]+)`(?:\s*→\s*(.+))?/);
+            // Skills may be bare (- skill-name) or backtick-wrapped (- `skill-name`)
+            const m = l.match(/^-\s*`?([^`\n]+?)`?(?:\s*→.*)?$/);
             return m ? m[1].trim() : null;
           }).filter(Boolean);
         }
