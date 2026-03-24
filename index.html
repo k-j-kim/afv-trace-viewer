@@ -898,10 +898,10 @@ function renderStats(parsed) {
       <div class="stat-value">${avgTTFT}</div>
       <div class="stat-sub">ms</div>
     </div>
-    ${elapsed ? `<div class="stat-card">
+    <div class="stat-card">
       <div class="stat-label">Elapsed</div>
-      <div class="stat-value">${elapsed}</div>
-    </div>` : ''}
+      <div class="stat-value">${elapsed || '—'}</div>
+    </div>
   `;
 
   const allSkills = new Set(responses.flatMap(r => r.skills));
