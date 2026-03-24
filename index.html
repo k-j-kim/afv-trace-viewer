@@ -803,7 +803,7 @@ function parseSections(raw) {
       const progMatch = part.match(/\*\*Task Progress\*\*:\n([\s\S]*?)(?=\n\*\*|\n<details>|$)/);
       let taskItems = [];
       if (progMatch) {
-        taskItems = progMatch[1].trim().split('\n').map(l => {
+        taskItems = progMatch[1].trim().split(/\n|\\n/).map(l => {
           const m = l.match(/^-\s*\[(x| )\]\s*(.*)/i);
           if (!m) return null;
           return { done: m[1].toLowerCase() === 'x', text: m[2].trim() };
