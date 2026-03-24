@@ -392,6 +392,37 @@
 
   .detail-content.open { display: block; }
 
+  .detail-view-bar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+  }
+
+  .view-tab {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-size: 11px;
+    padding: 2px 8px;
+    cursor: pointer;
+    font-family: var(--mono);
+  }
+  .view-tab:hover { background: var(--bg3); }
+  .view-tab.active { background: var(--bg3); color: var(--text); border-color: var(--text-dim); }
+
+  .raw-pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin: 0;
+  }
+
   /* ── Divider between header meta and body ── */
   .turn-divider {
     border: none;
@@ -936,13 +967,13 @@ function buildCard(resp, req) {
       </ul>
     </div>` : '';
 
-  const reqPayload = req ? `
-    <button class="detail-toggle">&#9654; Request messages</button>
-    <div class="detail-content">${formatMessages(req.messagesJson)}</div>` : '';
+  const reqPayload = req
+    ? makeDetailBlock('Request messages', formatMessages(req.messagesJson), esc(req.messagesJson || req.raw))
+    : '';
 
-  const fullRespHtml = resp.fullResponse ? `
-    <button class="detail-toggle">&#9654; Full response</button>
-    <div class="detail-content formatted-response">${formatResponse(resp.fullResponse)}</div>` : '';
+  const fullRespHtml = resp.fullResponse
+    ? makeDetailBlock('Full response', formatResponse(resp.fullResponse), esc(resp.fullResponse))
+    : '';
 
   el.innerHTML = `
     <div class="turn-header" onclick="toggleCard(this.closest('.turn-card'))">
@@ -1189,13 +1220,33 @@ function toggleCard(card) {
   card.classList.toggle('collapsed');
 }
 
+// Build a collapsible detail block with formatted + raw toggle
+function makeDetailBlock(label, formattedHtml, rawHtml) {
+  const uid = 'db-' + Math.random().toString(36).slice(2);
+  return `<button class="detail-toggle">&#9658; ${esc(label)}</button>
+<div class="detail-content" id="${uid}">
+  <div class="detail-view-bar">
+    <button class="view-tab active" onclick="setDetailView('${uid}','fmt',this)">Formatted</button>
+    <button class="view-tab" onclick="setDetailView('${uid}','raw',this)">Raw</button>
+  </div>
+  <div class="detail-fmt">${formattedHtml}</div>
+  <div class="detail-raw" style="display:none"><pre class="raw-pre">${rawHtml}</pre></div>
+</div>`;
+}
+
+function setDetailView(uid, mode, btn) {
+  const block = document.getElementById(uid);
+  block.querySelector('.detail-fmt').style.display = mode === 'fmt' ? '' : 'none';
+  block.querySelector('.detail-raw').style.display = mode === 'raw' ? '' : 'none';
+  block.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t === btn));
+}
+
 document.addEventListener('click', e => {
   if (!e.target.classList.contains('detail-toggle')) return;
   const btn = e.target;
   const content = btn.nextElementSibling;
   if (!content || !content.classList.contains('detail-content')) return;
   const open = content.classList.toggle('open');
-  // The label text is everything after the first space
   const parts = btn.textContent.trim().split(/\s+(.+)/);
   const label = parts[1] || parts[0];
   btn.textContent = (open ? '\u25be ' : '\u25b8 ') + label;
