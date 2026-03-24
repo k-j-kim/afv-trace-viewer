@@ -277,8 +277,9 @@
   }
 
   .badge-ttft { background: var(--purple-dim); color: var(--purple); }
-  .badge-tool  { background: var(--yellow-dim); color: var(--yellow); }
-  .badge-skill { background: var(--green-dim);  color: var(--green); }
+  .badge-tool  { background: var(--yellow-dim);  color: var(--yellow); }
+  .badge-skill { background: var(--green-dim);   color: var(--green); }
+  .badge-mcp   { background: var(--purple-dim);  color: var(--purple); cursor: default; }
   .badge-none  { background: var(--bg3); color: var(--text-dim); }
 
   .chevron {
@@ -905,6 +906,14 @@ function renderStats(parsed) {
 
   const allSkills = new Set(responses.flatMap(r => r.skills));
 
+  // MCPs: unique URLs from use_mcp_tool calls
+  const allMcps = new Set(
+    responses.flatMap(r => r.tools
+      .filter(t => t.name === 'use_mcp_tool' && t.detail)
+      .map(t => t.detail)
+    )
+  );
+
   bar.innerHTML += `<div class="tools-section">
     <div class="tools-section-label">Tools used (${allTools.size})</div>
     <div class="tools-section-body">${[...allTools].map(t => `<span class="badge badge-tool">${esc(t)}</span>`).join(' ') || '<span style="color:var(--text-dim);font-size:12px">none</span>'}</div>
@@ -912,6 +921,13 @@ function renderStats(parsed) {
   <div class="tools-section">
     <div class="tools-section-label">Skills used (${allSkills.size})</div>
     <div class="tools-section-body">${[...allSkills].map(s => `<span class="badge badge-skill">${esc(s)}</span>`).join(' ') || '<span style="color:var(--text-dim);font-size:12px">none</span>'}</div>
+  </div>
+  <div class="tools-section">
+    <div class="tools-section-label">MCPs used (${allMcps.size})</div>
+    <div class="tools-section-body">${[...allMcps].map(url => {
+      const label = url.split('/').pop() || url;
+      return `<span class="badge badge-mcp" title="${esc(url)}">${esc(label)}</span>`;
+    }).join(' ') || '<span style="color:var(--text-dim);font-size:12px">none</span>'}</div>
   </div>`;
 }
 
