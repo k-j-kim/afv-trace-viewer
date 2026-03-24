@@ -862,6 +862,7 @@ function renderStats(parsed) {
   const totalIn = responses.reduce((s, r) => s + r.tokIn, 0);
   const totalOut = responses.reduce((s, r) => s + r.tokOut, 0);
   const totalCache = responses.reduce((s, r) => s + r.tokCache, 0);
+  const totalTokens = totalIn + totalOut;
   const avgTTFT = responses.length ? Math.round(responses.reduce((s, r) => s + r.ttft, 0) / responses.length) : 0;
   const allTools = new Set(responses.flatMap(r => r.tools.map(t => t.name)));
 
@@ -892,6 +893,10 @@ function renderStats(parsed) {
     <div class="stat-card">
       <div class="stat-label">Cache Read</div>
       <div class="stat-value">${fmtNum(totalCache)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Tokens</div>
+      <div class="stat-value">${fmtNum(totalTokens)}</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Avg TTFT</div>
