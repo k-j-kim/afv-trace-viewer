@@ -446,6 +446,21 @@
   }
   #back-btn:hover { color: var(--text); }
 
+  #raw-trace {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-muted);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
   /* ── Message blocks (request payload) ── */
   .msg-block {
     border-left: 2px solid var(--border);
@@ -735,9 +750,11 @@
     <button class="btn btn-secondary" onclick="setAllCollapsed(true)">Collapse all</button>
     <button class="btn btn-secondary" onclick="setAllCollapsed(false)">Expand all</button>
     <button id="share-btn" class="btn btn-secondary" style="display:none" onclick="copyShareLink()">Copy share link</button>
+    <button id="raw-btn" class="btn btn-secondary" onclick="toggleRawTrace()">Raw trace</button>
   </div>
   <div id="stats-bar"></div>
   <div id="turns-list"></div>
+  <pre id="raw-trace" style="display:none"></pre>
 </div>
 
 <script>
@@ -1034,8 +1051,7 @@ function renderTurns(parsed) {
     const resp = responses[i];
     const req = requests[resp.promptId] || null;
 
-    // Skip prompt card for the first turn — only show prompts between existing turn cards
-    const promptCard = i > 0 ? buildUserPromptCard(resp, req) : null;
+    const promptCard = buildUserPromptCard(resp, req);
     if (promptCard) list.appendChild(promptCard.el);
 
     const card = buildCard(resp, req);
@@ -1400,6 +1416,25 @@ function showLoadArea() {
   document.getElementById('viewer').style.display = 'none';
   document.getElementById('load-area').style.display = 'block';
   document.getElementById('share-btn').style.display = 'none';
+}
+
+function toggleRawTrace() {
+  const raw = document.getElementById('raw-trace');
+  const list = document.getElementById('turns-list');
+  const stats = document.getElementById('stats-bar');
+  const showing = raw.style.display !== 'none';
+  if (!showing) {
+    raw.textContent = document.getElementById('md-input').value;
+    raw.style.display = '';
+    list.style.display = 'none';
+    stats.style.display = 'none';
+    document.getElementById('raw-btn').textContent = 'Parsed view';
+  } else {
+    raw.style.display = 'none';
+    list.style.display = '';
+    stats.style.display = '';
+    document.getElementById('raw-btn').textContent = 'Raw trace';
+  }
 }
 
 // ── ?url= loading ────────────────────────────────────────────────────────────
