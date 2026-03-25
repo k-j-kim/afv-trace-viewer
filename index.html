@@ -667,6 +667,34 @@
     line-height: 1.4;
   }
 
+  /* ── User prompt cards ── */
+  .user-prompt-card {
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    margin-bottom: 4px;
+    overflow: hidden;
+  }
+
+  .user-prompt-card.hidden { display: none; }
+
+  .user-prompt-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .user-prompt-header:hover { background: rgba(56, 139, 253, 0.1); }
+
+  .user-prompt-body {
+    padding: 0 14px 12px;
+    border-top: 1px solid rgba(56, 139, 253, 0.3);
+  }
+  .user-prompt-card.collapsed .user-prompt-body { display: none; }
+  .user-prompt-card.collapsed .chevron { transform: rotate(-90deg); }
+
   /* ── Scrollbar ── */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -743,6 +771,7 @@ function parseSections(raw) {
   const parts = raw.split(/(?=^### )/m).filter(s => s.trim());
   const requests = {};
   const responses = [];
+  let respIdx = 0;
 
   for (const part of parts) {
     const headerMatch = part.match(/^### (\S+) \[(request|response)\]/);
@@ -753,16 +782,18 @@ function parseSections(raw) {
     if (type === 'request') {
       const promptId = (part.match(/\*\*Prompt Id\*\*: (\S+)/) || [])[1] || ts;
       const model = (part.match(/\*\*Model\*\*: ([^|]+)/) || [])[1]?.trim() || '';
-      // Extract messages JSON from <details> block
+      // Extract messages JSON from <details> block or plain ```/```json block
       // Require closing ``` to be at start of a line so inline ``` in JSON strings don't cut off early
-      const detailsMatch = part.match(/<details>[\s\S]*?```json\n([\s\S]*?)\n```[\s\S]*?<\/details>/);
+      const detailsMatch = part.match(/<details>[\s\S]*?```json\n([\s\S]*?)\n```[\s\S]*?<\/details>/)
+        || part.match(/\*\*Messages\*\*:\n```(?:json)?\n([\s\S]*?)\n```/);
       requests[promptId] = { ts, model, raw: part, messagesJson: detailsMatch ? detailsMatch[1].trim() : null };
     } else {
+      respIdx++;
       const promptId = (part.match(/\*\*Prompt Id\*\*: (\S+)/) || [])[1] || '';
-      const turnNum = parseInt((part.match(/\*\*Turn\*\*: (\d+)/) || [])[1] || '0');
-      const model = (part.match(/\*\*Model\*\*: ([^|]+)/) || [])[1]?.trim() || '';
-      const ttft = parseFloat((part.match(/\*\*TTFT\*\*: ([\d.]+)ms/) || [])[1] || '0');
-      const fallback = /\*\*Fallback\*\*: true/.test(part);
+      const turnNum = parseInt((part.match(/\*\*Turn\*\*: (\d+)/) || [])[1] || '0') || respIdx;
+      const model = (part.match(/\*\*Model(?:\s+Id)?\*\*: ([^|\n]+)/) || [])[1]?.trim() || '';
+      const ttft = parseFloat((part.match(/\*\*TTFT\*\*: ([\d.]+)ms/) || part.match(/\*\*Time to first token\*\*: ([\d.]+)/) || [])[1] || '0');
+      const fallback = /\*\*Fallback\*\*: true/.test(part) || /\*\*Is this response using a fallback model\?\*\*: true/.test(part);
 
       // Tokens: X in / Y out optionally / Z cache-read
       const tokLine = part.match(/\*\*Tokens\*\*: ([\d,]+) in \/ ([\d,]+) out(?:\s*\/\s*([\d,]+) cache-read)?/);
@@ -810,9 +841,10 @@ function parseSections(raw) {
         }).filter(Boolean);
       }
 
-      // Full response from <details>
+      // Full response from <details> block or inline **Response**: field
       const respDetails = part.match(/<details>\s*<summary>Full Response<\/summary>([\s\S]*?)<\/details>/);
-      const fullResponse = respDetails ? respDetails[1].trim() : '';
+      const respInline = part.match(/\*\*Response\*\*:\n([\s\S]+)/);
+      const fullResponse = respDetails ? respDetails[1].trim() : (respInline ? respInline[1].trim() : '');
 
       responses.push({ ts, promptId, turnNum, model, ttft, fallback, tokIn, tokOut, tokCache, tools, skills, taskItems, fullResponse, raw: part });
     }
@@ -936,15 +968,68 @@ function renderStats(parsed) {
   </div>`;
 }
 
+function extractUserPrompt(req) {
+  if (!req || !req.messagesJson) return null;
+  let msgs;
+  try { msgs = JSON.parse(req.messagesJson); } catch(e) { return null; }
+  if (!Array.isArray(msgs)) return null;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i].role === 'user') return getContent(msgs[i]);
+  }
+  return null;
+}
+
+const PROMPT_PREVIEW_CHARS = 400;
+
+function buildUserPromptCard(resp, req) {
+  if (!req) return null;
+  const prompt = extractUserPrompt(req);
+  if (!prompt) return null;
+
+  const el = document.createElement('div');
+  el.className = 'user-prompt-card';
+
+  const uid = 'up-' + Math.random().toString(36).slice(2);
+  const isLong = prompt.length > PROMPT_PREVIEW_CHARS;
+  const preview = isLong ? prompt.slice(0, PROMPT_PREVIEW_CHARS) : prompt;
+  const rest = isLong ? prompt.slice(PROMPT_PREVIEW_CHARS) : '';
+
+  el.innerHTML = `
+    <div class="user-prompt-header" onclick="toggleCard(this.closest('.user-prompt-card'))">
+      <span class="msg-role role-user">user</span>
+      <span class="turn-ts">${formatTs(req.ts)}</span>
+      <span class="msg-char-count" style="margin-left:auto">${fmtNum(prompt.length)} chars</span>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="user-prompt-body">
+      <div class="msg-content" style="padding-top:10px">${highlightContent(preview)}${isLong
+        ? `<span id="${uid}-rest" class="msg-rest" style="display:none">${highlightContent(rest)}</span><button class="msg-expand" onclick="toggleMsgExpand('${uid}')">&#9654; show ${fmtNum(rest.length)} more chars</button>`
+        : ''}</div>
+    </div>
+  `;
+
+  return { el, searchText: prompt.toLowerCase() };
+}
+
 function renderTurns(parsed) {
   const { requests, responses } = parsed;
   const list = document.getElementById('turns-list');
   list.innerHTML = '';
   allCards = [];
 
-  for (const resp of responses) {
+  for (let i = 0; i < responses.length; i++) {
+    const resp = responses[i];
     const req = requests[resp.promptId] || null;
+
+    // Skip prompt card for the first turn — only show prompts between existing turn cards
+    const promptCard = i > 0 ? buildUserPromptCard(resp, req) : null;
+    if (promptCard) list.appendChild(promptCard.el);
+
     const card = buildCard(resp, req);
+    if (promptCard) {
+      card.el.dataset.searchText += ' ' + promptCard.searchText;
+      card.promptEl = promptCard.el;
+    }
     list.appendChild(card.el);
     allCards.push(card);
   }
@@ -1286,6 +1371,7 @@ function filterTurns(query) {
   for (const card of allCards) {
     const match = !q || card.el.dataset.searchText.includes(q);
     card.el.classList.toggle('hidden', !match);
+    if (card.promptEl) card.promptEl.classList.toggle('hidden', !match);
     if (match) visible++;
   }
   updateMatchCount(visible, allCards.length);
