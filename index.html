@@ -276,6 +276,7 @@
     white-space: nowrap;
   }
 
+  .badge-model { background: var(--bg3); color: var(--text-muted); }
   .badge-ttft { background: var(--purple-dim); color: var(--purple); }
   .badge-tool  { background: var(--yellow-dim);  color: var(--yellow); }
   .badge-skill { background: var(--green-dim);   color: var(--green); }
@@ -948,6 +949,7 @@ function renderStats(parsed) {
     </div>
   `;
 
+  const allModels = new Set(responses.map(r => r.model).filter(Boolean));
   const allSkills = new Set(responses.flatMap(r => r.skills));
 
   // MCPs: unique URLs from use_mcp_tool calls
@@ -959,6 +961,10 @@ function renderStats(parsed) {
   );
 
   bar.innerHTML += `<div class="tools-section">
+    <div class="tools-section-label">Model${allModels.size !== 1 ? 's' : ''} (${allModels.size})</div>
+    <div class="tools-section-body">${[...allModels].map(m => `<span class="badge badge-model">${esc(m)}</span>`).join(' ') || '<span style="color:var(--text-dim);font-size:12px">—</span>'}</div>
+  </div>
+  <div class="tools-section">
     <div class="tools-section-label">Tools used (${allTools.size})</div>
     <div class="tools-section-body">${[...allTools].map(t => `<span class="badge badge-tool">${esc(t)}</span>`).join(' ') || '<span style="color:var(--text-dim);font-size:12px">none</span>'}</div>
   </div>
@@ -1092,6 +1098,7 @@ function buildCard(resp, req) {
     <div class="turn-header" onclick="toggleCard(this.closest('.turn-card'))">
       <span class="turn-num">#${resp.turnNum}</span>
       <span class="turn-ts">${formatTs(resp.ts)}</span>
+      ${resp.model ? `<span class="badge badge-model">${esc(resp.model)}</span>` : ''}
       <span class="badge badge-ttft" style="color:${ttftColor}">${Math.round(resp.ttft)}ms</span>
       ${toolBadges}
       <span class="turn-tokens">${fmtNum(resp.tokIn)} in / ${fmtNum(resp.tokOut)} out${resp.tokCache ? ' / ' + fmtNum(resp.tokCache) + ' cached' : ''}</span>
