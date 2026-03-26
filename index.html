@@ -1356,8 +1356,8 @@ const _detailRawText = {};
 function makeDetailBlock(label, formattedHtml, rawText) {
   const uid = 'db-' + Math.random().toString(36).slice(2);
   _detailRawText[uid] = rawText;
-  // Convert literal \n to actual newlines for raw display (but not \\n which is an escaped backslash)
-  const rawDisplay = rawText.replace(/(?<!\\)\\n/g, '\n');
+  // Convert literal \n to actual newlines for raw display
+  const rawDisplay = rawText.split('\\n').join('\n');
   return `<button class="detail-toggle">&#9658; ${esc(label)}</button>
 <div class="detail-content" id="${uid}">
   <div class="detail-view-bar">
