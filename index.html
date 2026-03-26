@@ -1127,8 +1127,8 @@ function buildCard(resp, req) {
         <div class="tools-list">${toolListHtml}</div>
       </div>
       ${taskHtml}
-      ${reqPayload}
       ${fullRespHtml}
+      ${reqPayload}
     </div>
   `;
 
@@ -1356,17 +1356,25 @@ function toggleCard(card) {
   card.classList.toggle('collapsed');
 }
 
+// Store raw text for markdown rendering
+const _detailRawText = {};
+
 // Build a collapsible detail block with formatted + raw toggle
-function makeDetailBlock(label, formattedHtml, rawHtml) {
+function makeDetailBlock(label, formattedHtml, rawText) {
   const uid = 'db-' + Math.random().toString(36).slice(2);
+  _detailRawText[uid] = rawText;
+  // Convert literal \n to actual newlines for raw display
+  const rawDisplay = rawText.replace(/\\n/g, '\n');
   return `<button class="detail-toggle">&#9658; ${esc(label)}</button>
 <div class="detail-content" id="${uid}">
   <div class="detail-view-bar">
     <button class="view-tab active" onclick="setDetailView('${uid}','fmt',this)">Formatted</button>
+    <button class="view-tab" onclick="setDetailView('${uid}','md',this)">Markdown</button>
     <button class="view-tab" onclick="setDetailView('${uid}','raw',this)">Raw</button>
   </div>
   <div class="detail-fmt">${formattedHtml}</div>
-  <div class="detail-raw" style="display:none"><pre class="raw-pre">${rawHtml}</pre></div>
+  <div class="detail-md" style="display:none"></div>
+  <div class="detail-raw" style="display:none"><pre class="raw-pre">${rawDisplay}</pre></div>
 </div>`;
 }
 
@@ -1374,7 +1382,45 @@ function setDetailView(uid, mode, btn) {
   const block = document.getElementById(uid);
   block.querySelector('.detail-fmt').style.display = mode === 'fmt' ? '' : 'none';
   block.querySelector('.detail-raw').style.display = mode === 'raw' ? '' : 'none';
+  const mdEl = block.querySelector('.detail-md');
+  mdEl.style.display = mode === 'md' ? '' : 'none';
+  if (mode === 'md' && !mdEl.dataset.rendered) {
+    mdEl.innerHTML = renderMarkdown(_detailRawText[uid] || '');
+    mdEl.dataset.rendered = '1';
+  }
   block.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t === btn));
+}
+
+// Simple markdown renderer — input is HTML-escaped text
+function renderMarkdown(escaped) {
+  // Unescape to get raw text, then re-process
+  const raw = escaped.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+  // Convert literal \n to real newlines
+  const text = raw.replace(/\\n/g, '\n');
+  // Re-escape for safe rendering, then apply markdown transforms
+  let html = esc(text);
+  // Code blocks (before other transforms)
+  html = html.replace(/```(?:\w*)\n([\s\S]*?)```/g, '<pre style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;margin:8px 0;overflow-x:auto;font-size:12px;line-height:1.5;white-space:pre-wrap">$1</pre>');
+  // Headers
+  html = html.replace(/^(#{1,6}) (.+)$/gm, (_, h, t) => `<h${h.length} style="color:var(--text);margin:12px 0 6px;font-size:${18 - h.length}px">${t}</h${h.length}>`);
+  // Bold
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong style="color:var(--text)">$1</strong>');
+  // Italic
+  html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code style="background:var(--bg3);padding:1px 4px;border-radius:3px;color:var(--yellow)">$1</code>');
+  // Checkbox list items (before regular list)
+  html = html.replace(/^- \[x\] (.+)$/gm, '<li style="margin-left:20px;list-style:none">&#10003; $1</li>');
+  html = html.replace(/^- \[ \] (.+)$/gm, '<li style="margin-left:20px;list-style:none">&#9744; $1</li>');
+  // Unordered list items
+  html = html.replace(/^- (.+)$/gm, '<li style="margin-left:20px;list-style:disc">$1</li>');
+  // Numbered list items
+  html = html.replace(/^(\d+)\. (.+)$/gm, '<li style="margin-left:20px;list-style:decimal">$2</li>');
+  // Paragraphs (double newline)
+  html = html.replace(/\n\n/g, '</p><p style="margin:8px 0">');
+  // Single newlines to <br>
+  html = html.replace(/\n/g, '<br>');
+  return `<div class="markdown-rendered" style="font-family:var(--sans);font-size:13px;line-height:1.6;color:var(--text-muted);padding:8px 0"><p style="margin:8px 0">${html}</p></div>`;
 }
 
 document.addEventListener('click', e => {
