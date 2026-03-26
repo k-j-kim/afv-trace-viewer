@@ -864,13 +864,6 @@ function parseSections(raw) {
       const respInline = part.match(/\*\*Response\*\*:\n([\s\S]+)/);
       const fullResponse = respDetails ? respDetails[1].trim() : (respInline ? respInline[1].trim() : '');
 
-      // Extract selected_skill from response metadata (e.g. "intent=app selected_skill=foo ...")
-      // The metadata line may be nested inside XML tool tags like <plan_mode_respond><response>
-      if (skills.length === 0 && fullResponse) {
-        const skillMeta = fullResponse.match(/selected_skill=(\S+)/);
-        if (skillMeta) skills = [skillMeta[1]];
-      }
-
       responses.push({ ts, promptId, turnNum, model, ttft, fallback, tokIn, tokOut, tokCache, tools, skills, taskItems, fullResponse, raw: part });
     }
   }
