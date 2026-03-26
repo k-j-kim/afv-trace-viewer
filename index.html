@@ -314,16 +314,41 @@
 
   .tool-entry {
     display: flex;
-    align-items: baseline;
+    align-items: flex-start;
     gap: 8px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    background: var(--bg3);
+  }
+
+  .tool-main {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+    flex: 1;
   }
 
   .tool-detail {
     font-family: var(--mono);
     font-size: 11px;
     color: var(--text-dim);
-    word-break: break-all;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .tool-args {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 8px;
+    white-space: pre-wrap;
+    word-break: break-word;
   }
 
   .task-progress ol, .task-progress ul {
@@ -842,7 +867,7 @@ function parseSections(raw) {
           else if (typeof args.command === 'string' && args.command.trim()) detail = args.command.trim();
         }
 
-        result.tools.push({ name: fnName, detail });
+        result.tools.push({ name: fnName, detail, args: args && typeof args === 'object' ? args : null });
         if (fnName === 'use_skill' && detail) result.skills.push(detail);
       }
     }
@@ -855,10 +880,11 @@ function parseSections(raw) {
     const out = [];
     for (const t of items) {
       if (!t || !t.name) continue;
-      const key = `${t.name}\u0000${t.detail || ''}`;
+      const argsKey = t.args && typeof t.args === 'object' ? JSON.stringify(t.args) : '';
+      const key = `${t.name}\u0000${t.detail || ''}\u0000${argsKey}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ name: t.name, detail: t.detail || null });
+      out.push({ name: t.name, detail: t.detail || null, args: t.args && typeof t.args === 'object' ? t.args : null });
     }
     return out;
   }
@@ -920,7 +946,7 @@ function parseSections(raw) {
           tools = block.split('\n').map(l => {
             const m = l.match(/^-\s*`([^`]+)`(?:\s*→\s*(.+))?/);
             if (!m) return null;
-            return { name: m[1].trim(), detail: m[2]?.trim() || null };
+            return { name: m[1].trim(), detail: m[2]?.trim() || null, args: null };
           }).filter(Boolean);
         }
       }
@@ -1164,6 +1190,7 @@ function buildCard(resp, req) {
   el.dataset.searchText = [
     resp.fullResponse,
     resp.tools.map(t => t.name + ' ' + (t.detail || '')).join(' '),
+    resp.tools.map(t => t.args ? JSON.stringify(t.args) : '').join(' '),
     resp.skills.join(' '),
     resp.taskItems.map(t => t.text).join(' ')
   ].join(' ').toLowerCase();
@@ -1172,14 +1199,19 @@ function buildCard(resp, req) {
 
   // Header badges: name only (compact)
   const toolBadges = resp.tools.length
-    ? resp.tools.map(t => `<span class="badge badge-tool">${esc(t.name)}</span>`).join(' ')
+    ? `<span class="badge badge-tool">${resp.tools.length} tool${resp.tools.length === 1 ? '' : 's'}</span>`
     : `<span class="badge badge-none">none</span>`;
 
   // Body tool list: name + optional detail
   const toolListHtml = resp.tools.length
     ? resp.tools.map(t => `<div class="tool-entry">
         <span class="badge badge-tool">${esc(t.name)}</span>
-        ${t.detail ? `<span class="tool-detail">${esc(t.detail)}</span>` : ''}
+        <div class="tool-main">
+          ${t.detail ? `<div class="tool-detail">${esc(t.detail)}</div>` : ''}
+          ${t.args && Object.keys(t.args).length
+            ? `<div class="tool-args">${esc(JSON.stringify(t.args, null, 2))}</div>`
+            : ''}
+        </div>
       </div>`).join('')
     : `<span class="badge badge-none">none</span>`;
 
