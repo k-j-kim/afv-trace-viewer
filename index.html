@@ -785,8 +785,63 @@ function readFile(file) {
 
 // ── Parsing ──────────────────────────────────────────────────────────────────
 function parseSections(raw) {
+  function extractToolAndSkillInvocations(messagesJson) {
+    const result = { tools: [], skills: [] };
+    if (!messagesJson) return result;
+
+    let msgs;
+    try { msgs = JSON.parse(messagesJson); } catch { return result; }
+    if (!Array.isArray(msgs)) return result;
+
+    for (const msg of msgs) {
+      const invocations = Array.isArray(msg?.tool_invocations) ? msg.tool_invocations : [];
+      for (const inv of invocations) {
+        const fn = inv?.function || {};
+        const fnName = (fn.name || '').trim();
+        if (!fnName) continue;
+
+        let args = {};
+        if (typeof fn.arguments === 'string' && fn.arguments.trim()) {
+          try { args = JSON.parse(fn.arguments); } catch { args = {}; }
+        } else if (fn.arguments && typeof fn.arguments === 'object') {
+          args = fn.arguments;
+        }
+
+        let detail = null;
+        if (args && typeof args === 'object') {
+          if (typeof args.skill_name === 'string' && args.skill_name.trim()) detail = args.skill_name.trim();
+          else if (typeof args.url === 'string' && args.url.trim()) detail = args.url.trim();
+          else if (typeof args.server === 'string' && args.server.trim()) detail = args.server.trim();
+          else if (typeof args.command === 'string' && args.command.trim()) detail = args.command.trim();
+        }
+
+        result.tools.push({ name: fnName, detail });
+        if (fnName === 'use_skill' && detail) result.skills.push(detail);
+      }
+    }
+
+    return result;
+  }
+
+  function dedupeTools(items) {
+    const seen = new Set();
+    const out = [];
+    for (const t of items) {
+      if (!t || !t.name) continue;
+      const key = `${t.name}\u0000${t.detail || ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ name: t.name, detail: t.detail || null });
+    }
+    return out;
+  }
+
+  function dedupeStrings(items) {
+    return [...new Set(items.filter(Boolean))];
+  }
+
   // Split on ### headers that start a line
-  const parts = raw.split(/(?=^### )/m).filter(s => s.trim());
+  const parts = raw.replace(/\r\n?/g, '\n').split(/(?=^### )/m).filter(s => s.trim());
   const requests = {};
   const responses = [];
   let respIdx = 0;
@@ -804,7 +859,16 @@ function parseSections(raw) {
       // Require closing ``` to be at start of a line so inline ``` in JSON strings don't cut off early
       const detailsMatch = part.match(/<details>[\s\S]*?```json\n([\s\S]*?)\n```[\s\S]*?<\/details>/)
         || part.match(/\*\*Messages\*\*:\n```(?:json)?\n([\s\S]*?)\n```/);
-      requests[promptId] = { ts, model, raw: part, messagesJson: detailsMatch ? detailsMatch[1].trim() : null };
+      const messagesJson = detailsMatch ? detailsMatch[1].trim() : null;
+      const inferred = extractToolAndSkillInvocations(messagesJson);
+      requests[promptId] = {
+        ts,
+        model,
+        raw: part,
+        messagesJson,
+        inferredTools: inferred.tools,
+        inferredSkills: inferred.skills
+      };
     } else {
       respIdx++;
       const promptId = (part.match(/\*\*Prompt Id\*\*: (\S+)/) || [])[1] || '';
@@ -846,6 +910,14 @@ function parseSections(raw) {
             return m ? m[1].trim() : null;
           }).filter(Boolean);
         }
+      }
+
+      // Newer traces often store tool calls in request message JSON (tool_invocations).
+      // Merge inferred data so tools/skills still render even when response blocks are absent.
+      const reqMeta = requests[promptId];
+      if (reqMeta) {
+        tools = dedupeTools([...(tools || []), ...(reqMeta.inferredTools || [])]);
+        skills = dedupeStrings([...(skills || []), ...(reqMeta.inferredSkills || [])]);
       }
 
       // Task progress
